@@ -29,13 +29,18 @@ object CreateDatabase {
   def main(args: Array[String]): Unit = {
     // input directory with the tsv
     val noTweets = args(0)
+    val path = args(1) // e.g. hdfs://IP:PORT/path_to_file/
     val schemaName = "TwitterDB" + noTweets + "K"
-    val authorDimensionFile = "hdfs://hadoop-master:8020/user/ciprian/TwitterDB/" + schemaName + "/author_dimension.csv"
-    val documentDimensionFile = "hdfs://hadoop-master:8020/user/ciprian/TwitterDB/" + schemaName + "/document_dimension.csv"
-    val documentFactsFile = "hdfs://hadoop-master:8020/user/ciprian/TwitterDB/" + schemaName + "/document_facts.csv"
-    val locationDimensionFile = "hdfs://hadoop-master:8020/user/ciprian/TwitterDB/" + schemaName + "/location_dimension.csv"
-    val timeDimensionFile = "hdfs://hadoop-master:8020/user/ciprian/TwitterDB/" + schemaName + "/time_dimension.csv"
-    val wordDimensionFile = "hdfs://hadoop-master:8020/user/ciprian/TwitterDB/" + schemaName + "/word_dimension.csv"
+    val authorDimensionFile = path + schemaName + "/author_dimension.csv"
+    val documentDimensionFile = path + schemaName + "/document_dimension.csv"
+    val documentFactsFile = path + schemaName + "/document_facts.csv"
+    val locationDimensionFile = path + schemaName + "/location_dimension.csv"
+    val timeDimensionFile = path + schemaName + "/time_dimension.csv"
+    val wordDimensionFile = path + schemaName + "/word_dimension.csv"
+    val bridgeTagDimensionFile = path + schemaName + "/bridge_tag_dimension.csv"
+    val tagDimensionFile = path + schemaName + "/tag_dimension.csv"
+    val bridgeNamedEntityDimensionFile = path + schemaName + "/bridge_namedentity_dimension.csv"
+    val namedEntityDimensionFile = path + schemaName + "/namedentity_dimension.csv"
 
     // the tsv schema
     val authorDimensionSchema = StructType(Array(
@@ -79,6 +84,24 @@ object CreateDatabase {
       StructField("id_word", LongType, false),
       StructField("word", StringType, true)))
 
+    val bridgeTagDimension = StructType(Array(
+      StructField("id_document", LongType, false),
+      StructField("id_tag", LongType, false)))
+
+    val tagDimension = StructType(Array(
+      StructField("id_tag", LongType, false),
+      StructField("tag", StringType, true),
+      StructField("type", StringType, true)))
+
+    val bridgeNamedEntityDimension = StructType(Array(
+      StructField("id_document", LongType, false),
+      StructField("id_namedentity", LongType, false)))
+
+    val namedEntityDimension = StructType(Array(
+      StructField("id_namedentity", LongType, false),
+      StructField("entity", StringType, true),
+      StructField("type", StringType, true)))
+
 
     // Spark session
     // Create spark configuration
@@ -95,6 +118,10 @@ object CreateDatabase {
     hc.sql("drop table if exists " + schemaName + ".location_dimension")
     hc.sql("drop table if exists " + schemaName + ".time_dimension")
     hc.sql("drop table if exists " + schemaName + ".word_dimension")
+    hc.sql("drop table if exists " + schemaName + ".bridge_tag_dimension")
+    hc.sql("drop table if exists " + schemaName + ".tag_dimension")
+    hc.sql("drop table if exists " + schemaName + ".bridge_namedentity_dimension")
+    hc.sql("drop table if exists " + schemaName + ".namedentity_dimension")
 
     val t0 = System.nanoTime()
 
@@ -105,6 +132,10 @@ object CreateDatabase {
     val locationDimensionDF = hc.read.format("csv").option("header", "false").option("delimiter", ",").schema(locationDimensionSchema).load(locationDimensionFile)
     val timeDimensionDF = hc.read.format("csv").option("header", "false").option("delimiter", ",").schema(timeDimensionSchema).load(timeDimensionFile)
     val wordDimensionDF = hc.read.format("csv").option("header", "false").option("delimiter", ",").schema(wordDimensionSchema).load(wordDimensionFile)
+    val bridgeTagDimensionDF = hc.read.format("csv").option("header", "false").option("delimiter", ",").schema(wordDimensionSchema).load(bridgeTagDimensionFile)
+    val tagDimensionDF = hc.read.format("csv").option("header", "false").option("delimiter", ",").schema(wordDimensionSchema).load(tagDimensionFile)
+    val bridgeNamedEntityDimensionDF = hc.read.format("csv").option("header", "false").option("delimiter", ",").schema(wordDimensionSchema).load(bridgeNamedEntityDimensionFile)
+    val namedEntityDimensionDF = hc.read.format("csv").option("header", "false").option("delimiter", ",").schema(wordDimensionSchema).load(namedEntityDimensionFile)
 
     // create a view to query
     authorDimensionDF.createOrReplaceTempView("author_dimension")
@@ -124,6 +155,18 @@ object CreateDatabase {
 
     wordDimensionDF.createOrReplaceTempView("word_dimension")
     hc.sql("select * from word_dimension").write.format("orc").saveAsTable(schemaName + ".word_dimension")
+
+    bridgeTagDimensionDF.createOrReplaceTempView("bridge_tag_dimension")
+    hc.sql("select * from bridge_tag_dimension").write.format("orc").saveAsTable(schemaName + ".bridge_tag_dimension")
+
+    tagDimensionDF.createOrReplaceTempView("tag_dimension")
+    hc.sql("select * from tag_dimension").write.format("orc").saveAsTable(schemaName + ".tag_dimension")
+
+    bridgeNamedEntityDimensionDF.createOrReplaceTempView("bridge_namedentity_dimension")
+    hc.sql("select * from bridge_namedentity_dimension").write.format("orc").saveAsTable(schemaName + ".bridge_namedentity_dimension")
+
+    namedEntityDimensionDF.createOrReplaceTempView("namedentity_dimension")
+    hc.sql("select * from namedentity_dimension").write.format("orc").saveAsTable(schemaName + ".namedentity_dimension")
 
     val t1 = System.nanoTime()
     println("Elapsed time (ms): " + ((t1 - t0) / 1e6))
